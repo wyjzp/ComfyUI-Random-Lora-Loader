@@ -187,8 +187,11 @@ class RandomLoraLoaderModelOnly:
         return {
             "required": {
                 "model": ("MODEL",),
+                # Keep a native combo as the transport widget. This guarantees
+                # ComfyUI always serializes `folder`; the frontend decorates the
+                # existing combo with the optional tree popup.
                 "folder": (
-                    "STRING",
+                    folders or [NO_FOLDER_OPTION],
                     {
                         "default": folders[0] if folders else NO_FOLDER_OPTION,
                         "widgetType": "KREA2_LORA_SELECTION",
@@ -210,7 +213,9 @@ class RandomLoraLoaderModelOnly:
         }
 
     @classmethod
-    def VALIDATE_INPUTS(cls, folder):
+    def VALIDATE_INPUTS(cls, folder=None):
+        if folder is None:
+            return "请选择至少一个 LoRA 文件或文件夹"
         try:
             resolve_candidates(folder)
             return True
@@ -218,7 +223,9 @@ class RandomLoraLoaderModelOnly:
             return str(error)
 
     @classmethod
-    def IS_CHANGED(cls, model, folder, strength_model):
+    def IS_CHANGED(cls, model=None, folder=None, strength_model=1.0):
+        if folder is None:
+            return float("nan")
         try:
             candidates = resolve_candidates(folder)
         except ValueError:
