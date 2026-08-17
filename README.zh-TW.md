@@ -1,6 +1,6 @@
 # Krea2專用隨機 LoRA 載入器
 
-[English](README.en.md) | [简体中文](README.md) | 繁體中文
+[简体中文](README.md) | 繁體中文 | [English](README.en.md)
 
 這是一個專為 **Krea2** 設計的 ComfyUI 自訂節點，使用 ComfyUI 原生下拉選單選擇 LoRA 資料夾或單一 LoRA 檔案。
 

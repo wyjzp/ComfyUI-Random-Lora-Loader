@@ -1,6 +1,6 @@
 # Krea2 Random LoRA Loader
 
-[English](README.en.md) | [简体中文](README.md) | [繁體中文](README.zh-TW.md)
+[简体中文](README.md) | [繁體中文](README.zh-TW.md) | English
 
 A ComfyUI custom node dedicated to **Krea2**. It uses ComfyUI's native dropdown list to select a LoRA folder or an individual LoRA file.
 

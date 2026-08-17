@@ -1,6 +1,6 @@
 # Krea2专用随机LoRA加载器
 
-[English](README.en.md) | 简体中文 | [繁體中文](README.zh-TW.md)
+简体中文 | [繁體中文](README.zh-TW.md) | [English](README.en.md)
 
 一个仅面向 **Krea2** 的 ComfyUI 自定义节点，使用原生下拉列表选择 LoRA 文件夹或单个 LoRA 文件。
 
