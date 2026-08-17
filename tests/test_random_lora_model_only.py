@@ -214,6 +214,30 @@ class RandomLoraLoaderTests(unittest.TestCase):
         self.assertIsInstance(error, str)
         self.assertIn("不存在", error)
 
+    def test_workflow_properties_override_legacy_folder(self):
+        metadata = {
+            "workflow": {
+                "nodes": [{
+                    "id": 165,
+                    "properties": {
+                        self.module.SELECTION_PROPERTY_KEY: config(
+                            file("人物/写实/B.safetensors")
+                        )
+                    },
+                }]
+            }
+        }
+        selected = self.module.selection_from_workflow_properties([165], metadata)
+        self.assertEqual(
+            self.module.resolve_candidates(selected, FILES),
+            ["人物/写实/B.safetensors"],
+        )
+
+    def test_missing_workflow_properties_use_legacy_folder(self):
+        self.assertIsNone(
+            self.module.selection_from_workflow_properties(165, {})
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

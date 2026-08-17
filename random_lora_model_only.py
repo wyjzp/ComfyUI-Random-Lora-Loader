@@ -14,6 +14,7 @@ import folder_paths
 
 
 SELECTION_VERSION = 1
+SELECTION_PROPERTY_KEY = "krea2_lora_selection"
 NO_FOLDER_OPTION = "（没有可用的 LoRA 文件夹）"
 WINDOWS_DRIVE_PATH = re.compile(r"^[A-Za-z]:")
 
@@ -159,6 +160,34 @@ def resolve_candidates(selection: Any, filenames: Iterable[str] | None = None) -
     return [candidates[path] for path in sorted(candidates)]
 
 
+def _normalized_node_id(unique_id: Any) -> str:
+    if isinstance(unique_id, (list, tuple)):
+        unique_id = unique_id[0] if unique_id else ""
+    return str(unique_id)
+
+
+def selection_from_workflow_properties(
+    unique_id: Any,
+    extra_pnginfo: Any,
+) -> Any | None:
+    """Read optional multi-selection from the saved workflow node properties."""
+    if not isinstance(extra_pnginfo, Mapping):
+        return None
+    workflow = extra_pnginfo.get("workflow")
+    if not isinstance(workflow, Mapping):
+        return None
+    node_id = _normalized_node_id(unique_id)
+    for workflow_node in workflow.get("nodes", []):
+        if not isinstance(workflow_node, Mapping):
+            continue
+        if str(workflow_node.get("id")) != node_id:
+            continue
+        properties = workflow_node.get("properties")
+        if isinstance(properties, Mapping):
+            return properties.get(SELECTION_PROPERTY_KEY)
+    return None
+
+
 class RandomLoraLoaderModelOnly:
     """Load fixed one-file or randomly selected multi-file MODEL-only LoRAs."""
 
@@ -191,7 +220,8 @@ class RandomLoraLoaderModelOnly:
                     folders or [NO_FOLDER_OPTION],
                     {
                         "default": default_folder,
-                        "tooltip": "选择 Krea2 LoRA 文件夹；会递归包含子文件夹。",
+                        "lora_files": list(folder_paths.get_filename_list("loras")),
+                        "tooltip": "默认文件夹。点击此行可打开多选 LoRA 树。",
                     },
                 ),
                 "strength_model": (
@@ -204,25 +234,46 @@ class RandomLoraLoaderModelOnly:
                         "tooltip": "模型强度。0 时保留原模型，但仍输出本次选择名称。",
                     },
                 ),
-            }
+            },
+            "hidden": {
+                "selection_node_id": "UNIQUE_ID",
+                "extra_pnginfo": "EXTRA_PNGINFO",
+            },
         }
 
     @classmethod
-    def VALIDATE_INPUTS(cls, folder=None):
+    def _resolved_selection(cls, folder, selection_node_id=None, extra_pnginfo=None):
+        return selection_from_workflow_properties(
+            selection_node_id, extra_pnginfo
+        ) or folder
+
+    @classmethod
+    def VALIDATE_INPUTS(cls, folder=None, selection_node_id=None, extra_pnginfo=None):
         if folder is None:
             return "请选择一个 LoRA 文件夹"
         try:
-            resolve_candidates(folder)
+            resolve_candidates(cls._resolved_selection(
+                folder, selection_node_id, extra_pnginfo
+            ))
             return True
         except ValueError as error:
             return str(error)
 
     @classmethod
-    def IS_CHANGED(cls, model=None, folder=None, strength_model=1.0):
+    def IS_CHANGED(
+        cls,
+        model=None,
+        folder=None,
+        strength_model=1.0,
+        selection_node_id=None,
+        extra_pnginfo=None,
+    ):
         if folder is None:
             return float("nan")
         try:
-            candidates = resolve_candidates(folder)
+            candidates = resolve_candidates(cls._resolved_selection(
+                folder, selection_node_id, extra_pnginfo
+            ))
         except ValueError:
             return float("nan")
         if len(candidates) > 1:
@@ -242,8 +293,17 @@ class RandomLoraLoaderModelOnly:
         self.loaded_lora = (lora_path, lora, lora_metadata)
         return lora, lora_metadata
 
-    def load_random_lora(self, model, folder, strength_model):
-        candidates = resolve_candidates(folder)
+    def load_random_lora(
+        self,
+        model,
+        folder,
+        strength_model,
+        selection_node_id=None,
+        extra_pnginfo=None,
+    ):
+        candidates = resolve_candidates(self._resolved_selection(
+            folder, selection_node_id, extra_pnginfo
+        ))
         selected_lora = candidates[0] if len(candidates) == 1 else random.choice(candidates)
 
         if strength_model == 0:

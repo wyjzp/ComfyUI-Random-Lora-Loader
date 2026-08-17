@@ -1,7 +1,7 @@
 from .random_lora_model_only import RandomLoraLoaderModelOnly
 
-# The experimental frontend selector is intentionally disabled until it can be
-# restored without interfering with ComfyUI's native widget serialization.
+WEB_DIRECTORY = "./web"
+
 NODE_CLASS_MAPPINGS = {
     "RandomLoraLoaderModelOnly": RandomLoraLoaderModelOnly,
 }
