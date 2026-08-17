@@ -2,6 +2,7 @@ import { app } from "../../../scripts/app.js";
 
 const NODE_CLASS = "RandomLoraLoaderModelOnly";
 const PROPERTY_KEY = "krea2_lora_selection";
+let knownLoraFiles = [];
 const STYLE_ID = "krea2-lora-tree-popup-style";
 
 function canonicalPath(value) {
@@ -265,30 +266,52 @@ function openTreePopup(node, folderWidget, files, event) {
     document.addEventListener("keydown", escape, true);
 }
 
+function bindRandomLoraNode(node) {
+    if (!node || (node.comfyClass !== NODE_CLASS && node.type !== NODE_CLASS)) return;
+    if (node.__krea2LoraPopupBound) return;
+    const inputSpec = node.constructor?.nodeData?.input?.required?.folder?.[1]
+        || node.constructor?.nodeData?.required?.folder?.[1]
+        || node._nodeData?.input?.required?.folder?.[1]
+        || {};
+    const files = [...new Set([
+        ...(inputSpec.lora_files || []),
+        ...knownLoraFiles,
+    ].map(canonicalPath))].sort();
+    const folderWidget = node.widgets?.find(widget => widget.name === "folder");
+    if (!folderWidget) return;
+    node.__krea2LoraPopupBound = true;
+    const originalMouse = folderWidget.mouse;
+    folderWidget.mouse = (event, pos, targetNode) => {
+        if (event.type === "pointerdown" && event.button === 0) {
+            openTreePopup(targetNode, folderWidget, files, event);
+            return true;
+        }
+        return originalMouse?.(event, pos, targetNode) || false;
+    };
+    const count = candidates(getConfig(node, folderWidget.value), files).size;
+    folderWidget.label = isChineseLocale() ? `LoRA选择（${count}）` : `LoRA Selection (${count})`;
+    localizeNode(node);
+}
+
 app.registerExtension({
     name: "wyjzp.Krea2RandomLoraLoader.PropertySelection",
+    nodeCreated(node) {
+        bindRandomLoraNode(node);
+    },
     beforeRegisterNodeDef(nodeType, nodeData) {
         if (nodeData.name !== NODE_CLASS) return;
+        const inputSpec = nodeData.input?.required?.folder?.[1]
+            || nodeData.required?.folder?.[1]
+            || {};
+        knownLoraFiles = [...new Set([
+            ...(inputSpec.lora_files || []),
+            ...knownLoraFiles,
+        ].map(canonicalPath))];
+        nodeType.nodeData = nodeData;
         const originalOnNodeCreated = nodeType.prototype.onNodeCreated;
         nodeType.prototype.onNodeCreated = function () {
             const result = originalOnNodeCreated?.apply(this, arguments);
-            const spec = nodeData.input?.required?.folder?.[1] || {};
-            const files = (spec.lora_files || []).map(canonicalPath).sort();
-            const folderWidget = this.widgets?.find(widget => widget.name === "folder");
-            if (folderWidget && !this.__krea2LoraPopupBound) {
-                this.__krea2LoraPopupBound = true;
-                const originalMouse = folderWidget.mouse;
-                folderWidget.mouse = (event, pos, targetNode) => {
-                    if (event.type === "pointerdown" && event.button === 0) {
-                        openTreePopup(targetNode, folderWidget, files, event);
-                        return true;
-                    }
-                    return originalMouse?.(event, pos, targetNode) || false;
-                };
-                const count = candidates(getConfig(this, folderWidget.value), files).size;
-                folderWidget.label = isChineseLocale() ? `LoRA选择（${count}）` : `LoRA Selection (${count})`;
-            }
-            localizeNode(this);
+            bindRandomLoraNode(this);
             return result;
         };
     },
