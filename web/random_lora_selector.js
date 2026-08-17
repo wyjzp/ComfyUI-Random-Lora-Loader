@@ -267,44 +267,66 @@ function openTreePopup(node, folderWidget, files, event) {
     document.addEventListener("keydown", escape, true);
 }
 
-function bindRandomLoraNode(node) {
-    if (!node || (node.comfyClass !== NODE_CLASS && node.type !== NODE_CLASS)) return;
-    if (node.__krea2LoraPopupBound) return;
-    const inputSpec = node.constructor?.nodeData?.input?.required?.selection_button?.[1]
-        || node.constructor?.nodeData?.required?.selection_button?.[1]
-        || node._nodeData?.input?.required?.selection_button?.[1]
-        || {};
+function createSelectionButton(node, inputName, inputData) {
+    const spec = inputData?.[1] || {};
     const files = [...new Set([
-        ...(inputSpec.lora_files || []),
+        ...(spec.lora_files || []),
         ...knownLoraFiles,
     ].map(canonicalPath))].sort();
-    const folderWidget = node.widgets?.find(widget => widget.name === "selection_button");
-    if (!folderWidget) return;
-    node.__krea2LoraPopupBound = true;
-    const originalMouse = folderWidget.mouse;
-    folderWidget.mouse = (event, pos, targetNode) => {
-        const isLeftActivation = (
-            ["pointerdown", "mousedown", "click"].includes(event.type)
-            && (event.button === undefined || event.button === 0)
-        );
-        if (isLeftActivation) {
-            // Consume every mouse phase so the native combo menu never opens.
-            event.preventDefault?.();
-            event.stopPropagation?.();
-            openTreePopup(targetNode, folderWidget, files, event);
-            return true;
-        }
-        return false;
+    const widget = {
+        name: inputName,
+        type: "KREA2_LORA_BUTTON",
+        value: spec.default || "人物",
+        options: spec,
+        computeSize: width => [width || 220, 28],
+        draw(ctx, drawNode, width, y, height) {
+            const margin = 10;
+            const rowHeight = Math.min(height || 28, 28);
+            const rowWidth = Math.max(0, Math.min(width || drawNode.size[0], drawNode.size[0]) - margin * 2);
+            const rowY = y + Math.max(0, ((height || rowHeight) - rowHeight) / 2);
+            ctx.save();
+            ctx.beginPath();
+            ctx.rect(0, y, drawNode.size[0], height || rowHeight);
+            ctx.clip();
+            ctx.fillStyle = "#252525";
+            ctx.strokeStyle = "#666";
+            ctx.beginPath();
+            ctx.roundRect(margin, rowY, rowWidth, rowHeight, 6);
+            ctx.fill();
+            ctx.stroke();
+            ctx.fillStyle = "#ddd";
+            ctx.font = "12px sans-serif";
+            ctx.textBaseline = "middle";
+            const selected = candidates(getConfig(drawNode, this.value), files).size;
+            const label = isChineseLocale() ? `LoRA选择（${selected}）` : `LoRA Selection (${selected})`;
+            ctx.fillText(label, margin + 9, rowY + rowHeight / 2);
+            ctx.fillStyle = "#aaa";
+            ctx.fillText("▾", margin + rowWidth - 16, rowY + rowHeight / 2);
+            ctx.restore();
+        },
+        mouse(event, _pos, targetNode) {
+            if (event.type === "pointerdown" && event.button === 0) {
+                event.preventDefault?.();
+                event.stopPropagation?.();
+                openTreePopup(targetNode, widget, files, event);
+                return true;
+            }
+            return false;
+        },
     };
-    const count = candidates(getConfig(node, folderWidget.value), files).size;
-    folderWidget.label = isChineseLocale() ? `LoRA选择（${count}）` : `LoRA Selection (${count})`;
-    localizeNode(node);
+    return widget;
 }
 
 app.registerExtension({
     name: "wyjzp.Krea2RandomLoraLoader.PropertySelection",
-    nodeCreated(node) {
-        bindRandomLoraNode(node);
+    getCustomWidgets() {
+        return {
+            KREA2_LORA_BUTTON: (node, inputName, inputData) => ({
+                widget: node.addCustomWidget(createSelectionButton(node, inputName, inputData)),
+                minWidth: 220,
+                minHeight: 28,
+            }),
+        };
     },
     beforeRegisterNodeDef(nodeType, nodeData) {
         if (nodeData.name !== NODE_CLASS) return;
@@ -319,7 +341,7 @@ app.registerExtension({
         const originalOnNodeCreated = nodeType.prototype.onNodeCreated;
         nodeType.prototype.onNodeCreated = function () {
             const result = originalOnNodeCreated?.apply(this, arguments);
-            bindRandomLoraNode(this);
+            localizeNode(this);
             return result;
         };
     },
