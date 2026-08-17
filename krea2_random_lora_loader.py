@@ -47,11 +47,13 @@ class Krea2RandomLoraLoader:
             "required": {
                 "model": ("MODEL",),
                 "selection_button": (
-                    "STRING",
+                    sorted(set(
+                        lora_folder_options()
+                        + list(folder_paths.get_filename_list("loras"))
+                    )) or ["人物"],
                     {
-                        "default": "选择 LoRA",
-                        "lora_files": list(folder_paths.get_filename_list("loras")),
-                        "tooltip": "点击打开 Krea2 LoRA 树选择器。",
+                        "default": "人物",
+                        "tooltip": "选择 LoRA 文件夹（递归随机）或单个 LoRA 文件（固定加载）。",
                     },
                 ),
                 "strength_model": (
@@ -72,8 +74,12 @@ class Krea2RandomLoraLoader:
         }
 
     @staticmethod
-    def _selection(unique_id: Any, extra_pnginfo: Any):
-        return selection_from_workflow_properties(unique_id, extra_pnginfo) or "人物"
+    def _selection(unique_id: Any, extra_pnginfo: Any, selection_button: str):
+        return (
+            selection_from_workflow_properties(unique_id, extra_pnginfo)
+            or selection_button
+            or "人物"
+        )
 
     @classmethod
     def IS_CHANGED(cls, *args, **kwargs):
@@ -101,7 +107,7 @@ class Krea2RandomLoraLoader:
         unique_id=None,
         extra_pnginfo=None,
     ):
-        selection = self._selection(unique_id, extra_pnginfo)
+        selection = self._selection(unique_id, extra_pnginfo, selection_button)
         candidates = resolve_candidates(selection)
         selected_lora = random.choice(candidates)
         if strength_model == 0:

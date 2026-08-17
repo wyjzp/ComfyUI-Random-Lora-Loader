@@ -1,7 +1,8 @@
 from .krea2_random_lora_loader import Krea2RandomLoraLoader
 from .random_lora_model_only import RandomLoraLoaderModelOnly
 
-WEB_DIRECTORY = "./web"
+# Keep this node on ComfyUI native combo widgets. The experimental tree UI is
+# intentionally disabled so selection can never fall back to a Value/OK editor.
 
 NODE_CLASS_MAPPINGS = {
     "Krea2RandomLoraLoader": Krea2RandomLoraLoader,
