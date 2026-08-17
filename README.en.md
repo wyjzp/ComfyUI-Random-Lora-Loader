@@ -1,5 +1,7 @@
 # Krea2 Random LoRA Loader
 
+[English](README.en.md) | [简体中文](README.md) | [繁體中文](README.zh-TW.md)
+
 A ComfyUI custom node dedicated to **Krea2**. It uses ComfyUI's native dropdown list to select a LoRA folder or an individual LoRA file.
 
 Krea2 LoRAs do not require prompt trigger words, making them suitable for runtime random selection. This plugin does not read, manage, or automatically add trigger words. It is not recommended for other models whose LoRAs require trigger words.

@@ -1,5 +1,7 @@
 # Krea2专用随机LoRA加载器
 
+[English](README.en.md) | 简体中文 | [繁體中文](README.zh-TW.md)
+
 一个仅面向 **Krea2** 的 ComfyUI 自定义节点，使用原生下拉列表选择 LoRA 文件夹或单个 LoRA 文件。
 
 Krea2 LoRA 不需要提示词触发词，因此适合每次运行随机加载；本插件不读取、管理或自动添加触发词，不建议用于依赖触发词的其他模型 LoRA。
