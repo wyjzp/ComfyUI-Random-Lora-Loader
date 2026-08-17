@@ -12,6 +12,7 @@ import folder_paths
 from .random_lora_model_only import (
     SELECTION_PROPERTY_KEY,
     _canonical_filename,
+    lora_folder_options,
     resolve_candidates,
     selection_from_workflow_properties,
 )
