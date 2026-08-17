@@ -84,6 +84,10 @@ function localizeOutputs(node) {
         node.outputs[1].name = label;
         node.outputs[1].label = label;
     }
+    const strength = node.widgets?.find(widget => widget.name === "strength_model");
+    if (strength) {
+        strength.label = chinese ? "模型强度" : "Model Strength";
+    }
 }
 
 function ensureStyles() {
@@ -113,10 +117,25 @@ function ensureStyles() {
     document.head.append(style);
 }
 
-function createNativeSelector(node, widget, files) {
+function createNativeSelector(node, inputName, inputData, files) {
     ensureStyles();
     const tree = buildTree(files);
-    let config = selectionFromValue(widget.value, files);
+    const widget = {
+        name: inputName,
+        type: "LORA_SELECTION",
+        options: inputData?.[1] || {},
+        value: selectionFromValue(inputData?.[1]?.default, files),
+    };
+    let config = widget.value;
+    // Saved workflows assign directly to widget.value during restoration. Keep
+    // the in-memory selection synchronized with that native assignment.
+    Object.defineProperty(widget, "value", {
+        configurable: true,
+        get: () => config,
+        set: value => {
+            config = selectionFromValue(value, files);
+        },
+    });
     const expanded = new Set();
     let popup = null;
     let anchor = null;
@@ -308,31 +327,28 @@ function createNativeSelector(node, widget, files) {
         return false;
     };
     widget.onRemove = closePopup;
-    node.setSize(node.computeSize());
-    node.setDirtyCanvas?.(true, true);
+    return widget;
 }
 
 app.registerExtension({
     name: "wyjzp.Krea2RandomLoraLoader.CanvasSelector",
+    getCustomWidgets() {
+        return {
+            LORA_SELECTION: (node, inputName, inputData) => {
+                const spec = inputData?.[1] || {};
+                const files = (spec.lora_files || []).map(canonicalPath).sort();
+                const widget = node.addCustomWidget(
+                    createNativeSelector(node, inputName, inputData, files),
+                );
+                return { widget, minWidth: 200, minHeight: 28 };
+            },
+        };
+    },
     beforeRegisterNodeDef(nodeType, nodeData) {
         if (nodeData.name !== NODE_CLASS) return;
         const originalOnNodeCreated = nodeType.prototype.onNodeCreated;
         nodeType.prototype.onNodeCreated = function () {
             const result = originalOnNodeCreated?.apply(this, arguments);
-            const spec = nodeData.input?.required?.folder?.[1] || {};
-            const files = (spec.lora_files || []).map(canonicalPath).sort();
-            const folderWidget = this.widgets?.find(widget => widget.name === "folder")
-                || this.addWidget("text", "folder", spec.default || "", () => {});
-            const folderIndex = this.widgets.indexOf(folderWidget);
-            const strengthIndex = this.widgets.findIndex(widget => widget.name === "strength_model");
-            if (folderIndex > strengthIndex && strengthIndex >= 0) {
-                this.widgets.splice(folderIndex, 1);
-                this.widgets.splice(strengthIndex, 0, folderWidget);
-            }
-            if (!this.__krea2LoraSelectorMounted) {
-                this.__krea2LoraSelectorMounted = true;
-                createNativeSelector(this, folderWidget, files);
-            }
             localizeOutputs(this);
             return result;
         };
