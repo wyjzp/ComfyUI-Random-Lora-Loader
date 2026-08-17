@@ -1,6 +1,6 @@
 import { app } from "../../../scripts/app.js";
 
-const NODE_CLASS = "RandomLoraLoaderModelOnly";
+const NODE_CLASS = "Krea2RandomLoraLoader";
 const PROPERTY_KEY = "krea2_lora_selection";
 let knownLoraFiles = [];
 const STYLE_ID = "krea2-lora-tree-popup-style";
@@ -107,7 +107,8 @@ function ensureStyles() {
 
 function localizeNode(node) {
     const chinese = isChineseLocale();
-    const folder = node.widgets?.find(widget => widget.name === "folder");
+    const folder = node.widgets?.find(widget => widget.name === "folder")
+        || node.widgets?.find(widget => widget.name === "selection_button");
     const strength = node.widgets?.find(widget => widget.name === "strength_model");
     if (folder) folder.label = chinese ? "LoRA选择" : "LoRA Selection";
     if (strength) strength.label = chinese ? "模型强度" : "Model Strength";
@@ -126,7 +127,7 @@ function openTreePopup(node, folderWidget, files, event) {
     ensureStyles();
     document.querySelectorAll(".krea2-lora-popup").forEach(item => item.remove());
     const tree = buildTree(files);
-    let config = getConfig(node, folderWidget.value);
+    let config = getConfig(node, folderWidget.name === "selection_button" ? "人物" : folderWidget.value);
     const expanded = new Set();
     const popup = document.createElement("div");
     popup.className = "krea2-lora-popup";
@@ -269,15 +270,15 @@ function openTreePopup(node, folderWidget, files, event) {
 function bindRandomLoraNode(node) {
     if (!node || (node.comfyClass !== NODE_CLASS && node.type !== NODE_CLASS)) return;
     if (node.__krea2LoraPopupBound) return;
-    const inputSpec = node.constructor?.nodeData?.input?.required?.folder?.[1]
-        || node.constructor?.nodeData?.required?.folder?.[1]
-        || node._nodeData?.input?.required?.folder?.[1]
+    const inputSpec = node.constructor?.nodeData?.input?.required?.selection_button?.[1]
+        || node.constructor?.nodeData?.required?.selection_button?.[1]
+        || node._nodeData?.input?.required?.selection_button?.[1]
         || {};
     const files = [...new Set([
         ...(inputSpec.lora_files || []),
         ...knownLoraFiles,
     ].map(canonicalPath))].sort();
-    const folderWidget = node.widgets?.find(widget => widget.name === "folder");
+    const folderWidget = node.widgets?.find(widget => widget.name === "selection_button");
     if (!folderWidget) return;
     node.__krea2LoraPopupBound = true;
     const originalMouse = folderWidget.mouse;
@@ -307,8 +308,8 @@ app.registerExtension({
     },
     beforeRegisterNodeDef(nodeType, nodeData) {
         if (nodeData.name !== NODE_CLASS) return;
-        const inputSpec = nodeData.input?.required?.folder?.[1]
-            || nodeData.required?.folder?.[1]
+        const inputSpec = nodeData.input?.required?.selection_button?.[1]
+            || nodeData.required?.selection_button?.[1]
             || {};
         knownLoraFiles = [...new Set([
             ...(inputSpec.lora_files || []),
