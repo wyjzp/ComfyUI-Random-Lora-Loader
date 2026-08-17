@@ -282,11 +282,18 @@ function bindRandomLoraNode(node) {
     node.__krea2LoraPopupBound = true;
     const originalMouse = folderWidget.mouse;
     folderWidget.mouse = (event, pos, targetNode) => {
-        if (event.type === "pointerdown" && event.button === 0) {
+        const isLeftActivation = (
+            ["pointerdown", "mousedown", "click"].includes(event.type)
+            && (event.button === undefined || event.button === 0)
+        );
+        if (isLeftActivation) {
+            // Consume every mouse phase so the native combo menu never opens.
+            event.preventDefault?.();
+            event.stopPropagation?.();
             openTreePopup(targetNode, folderWidget, files, event);
             return true;
         }
-        return originalMouse?.(event, pos, targetNode) || false;
+        return false;
     };
     const count = candidates(getConfig(node, folderWidget.value), files).size;
     folderWidget.label = isChineseLocale() ? `LoRA选择（${count}）` : `LoRA Selection (${count})`;
