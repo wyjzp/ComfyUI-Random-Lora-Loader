@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import random
 import re
 from pathlib import PurePosixPath, PureWindowsPath
@@ -83,11 +84,18 @@ def loras_in_folder(folder: str, filenames: Iterable[str] | None = None) -> list
 def _unwrap_selection(value: Any) -> Any:
     if isinstance(value, Mapping) and "__value__" in value:
         return value["__value__"]
+    if isinstance(value, str):
+        stripped = value.strip()
+        if stripped.startswith("{"):
+            try:
+                return json.loads(stripped)
+            except json.JSONDecodeError as error:
+                raise ValueError("LoRA 选择配置 JSON 无效") from error
     return value
 
 
 def normalize_selection(value: Any, filenames: Iterable[str] | None = None) -> list[tuple[str, str]]:
-    """Parse new tree config plus legacy folder/file strings safely."""
+    """Parse JSON tree config plus legacy folder/file strings safely."""
     value = _unwrap_selection(value)
     filenames = list(
         folder_paths.get_filename_list("loras") if filenames is None else filenames
@@ -180,12 +188,12 @@ class RandomLoraLoaderModelOnly:
             "required": {
                 "model": ("MODEL",),
                 "folder": (
-                    "LORA_SELECTION",
+                    "STRING",
                     {
                         "default": folders[0] if folders else NO_FOLDER_OPTION,
-                        "widgetType": "LORA_SELECTION",
+                        "widgetType": "KREA2_LORA_SELECTION",
                         "lora_files": list(folder_paths.get_filename_list("loras")),
-                        "tooltip": "左键展开文件夹；右键选择文件夹或 LoRA。单条固定，多条随机。",
+                        "tooltip": "点击打开 LoRA 树；左键展开，右键选择。单条固定，多条随机。",
                     },
                 ),
                 "strength_model": (
@@ -202,7 +210,7 @@ class RandomLoraLoaderModelOnly:
         }
 
     @classmethod
-    def VALIDATE_INPUTS(cls, folder, **_kwargs):
+    def VALIDATE_INPUTS(cls, folder):
         try:
             resolve_candidates(folder)
             return True

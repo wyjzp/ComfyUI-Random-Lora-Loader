@@ -117,25 +117,10 @@ function ensureStyles() {
     document.head.append(style);
 }
 
-function createNativeSelector(node, inputName, inputData, files) {
+function createNativeSelector(node, widget, files) {
     ensureStyles();
     const tree = buildTree(files);
-    const widget = {
-        name: inputName,
-        type: "LORA_SELECTION",
-        options: inputData?.[1] || {},
-        value: selectionFromValue(inputData?.[1]?.default, files),
-    };
-    let config = widget.value;
-    // Saved workflows assign directly to widget.value during restoration. Keep
-    // the in-memory selection synchronized with that native assignment.
-    Object.defineProperty(widget, "value", {
-        configurable: true,
-        get: () => config,
-        set: value => {
-            config = selectionFromValue(value, files);
-        },
-    });
+    let config = selectionFromValue(widget.value, files);
     const expanded = new Set();
     let popup = null;
     let anchor = null;
@@ -148,7 +133,9 @@ function createNativeSelector(node, inputName, inputData, files) {
     };
 
     const persist = () => {
-        widget.value = config;
+        // Standard STRING wire value avoids positional custom-widget corruption.
+        widget.value = JSON.stringify(config);
+        widget.callback?.(widget.value);
         node.setDirtyCanvas?.(true, true);
     };
 
@@ -283,17 +270,20 @@ function createNativeSelector(node, inputName, inputData, files) {
         window.addEventListener("scroll", positionPopup, true);
     };
 
-    widget.type = "LORA_SELECTION";
-    widget.value = config;
-    widget.serializeValue = () => config;
+    widget.serializeValue = () => JSON.stringify(config);
     widget.computeSize = width => [width || 200, 28];
-    widget.computeLayoutSize = () => ({ minWidth: 200, minHeight: 28 });
-    widget.draw = function (ctx, _node, width, y, height) {
+    widget.draw = function (ctx, drawNode, width, y, height) {
+        // This is the original STRING widget row, not an appended DOM/custom row.
+        // Clamp every draw operation to the current node width.
         const margin = 10;
+        const availableWidth = Math.min(width || drawNode.size[0], drawNode.size[0]);
         const rowHeight = Math.min(height || 28, 28);
         const rowY = y + Math.max(0, ((height || rowHeight) - rowHeight) / 2);
-        const rowWidth = Math.max(0, width - margin * 2);
+        const rowWidth = Math.max(0, availableWidth - margin * 2);
         ctx.save();
+        ctx.beginPath();
+        ctx.rect(0, rowY, drawNode.size[0], rowHeight);
+        ctx.clip();
         ctx.fillStyle = "#252525";
         ctx.strokeStyle = "#666";
         ctx.beginPath();
@@ -331,24 +321,19 @@ function createNativeSelector(node, inputName, inputData, files) {
 }
 
 app.registerExtension({
-    name: "wyjzp.Krea2RandomLoraLoader.CanvasSelector",
-    getCustomWidgets() {
-        return {
-            LORA_SELECTION: (node, inputName, inputData) => {
-                const spec = inputData?.[1] || {};
-                const files = (spec.lora_files || []).map(canonicalPath).sort();
-                const widget = node.addCustomWidget(
-                    createNativeSelector(node, inputName, inputData, files),
-                );
-                return { widget, minWidth: 200, minHeight: 28 };
-            },
-        };
-    },
+    name: "wyjzp.Krea2RandomLoraLoader.StableSelector",
     beforeRegisterNodeDef(nodeType, nodeData) {
         if (nodeData.name !== NODE_CLASS) return;
         const originalOnNodeCreated = nodeType.prototype.onNodeCreated;
         nodeType.prototype.onNodeCreated = function () {
             const result = originalOnNodeCreated?.apply(this, arguments);
+            const spec = nodeData.input?.required?.folder?.[1] || {};
+            const files = (spec.lora_files || []).map(canonicalPath).sort();
+            const folderWidget = this.widgets?.find(widget => widget.name === "folder");
+            if (folderWidget && !this.__krea2LoraSelectorMounted) {
+                this.__krea2LoraSelectorMounted = true;
+                createNativeSelector(this, folderWidget, files);
+            }
             localizeOutputs(this);
             return result;
         };

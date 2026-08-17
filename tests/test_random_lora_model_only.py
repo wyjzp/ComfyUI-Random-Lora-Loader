@@ -123,6 +123,19 @@ class RandomLoraLoaderTests(unittest.TestCase):
             ["人物/A.safetensors"],
         )
 
+    def test_json_string_selection_is_accepted(self):
+        import json
+
+        selection = json.dumps(config(file("人物/A.safetensors")), ensure_ascii=False)
+        self.assertEqual(
+            self.module.resolve_candidates(selection, FILES),
+            ["人物/A.safetensors"],
+        )
+
+    def test_invalid_json_string_is_rejected(self):
+        with self.assertRaises(ValueError):
+            self.module.resolve_candidates('{"version":', FILES)
+
     def test_invalid_paths_and_stale_entries_are_rejected(self):
         invalid = [
             "",
