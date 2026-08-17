@@ -171,32 +171,27 @@ class RandomLoraLoaderModelOnly:
     FUNCTION = "load_random_lora"
     CATEGORY = "model/loaders"
     DESCRIPTION = (
-        "从右键选择的 LoRA 文件或文件夹中加载：单条时固定加载，多条时每次执行随机加载。"
-        "仅修改 MODEL，不修改 CLIP。"
+        "Krea2 专用：从选定文件夹及其子文件夹随机加载一条 LoRA，仅修改 MODEL。"
     )
-    SEARCH_ALIASES = ["random lora", "随机 lora", "lora loader", "lora tree"]
+    SEARCH_ALIASES = ["random lora", "随机 lora", "krea2 lora"]
 
     def __init__(self):
         self.loaded_lora = None
 
     @classmethod
     def INPUT_TYPES(cls):
-        # The web extension replaces this custom input with a tree selector.
-        # default remains a legacy folder string so old workflow JSON still loads.
         folders = lora_folder_options()
+        default_folder = "人物" if "人物" in folders else (
+            folders[0] if folders else NO_FOLDER_OPTION
+        )
         return {
             "required": {
                 "model": ("MODEL",),
-                # Keep a native combo as the transport widget. This guarantees
-                # ComfyUI always serializes `folder`; the frontend decorates the
-                # existing combo with the optional tree popup.
                 "folder": (
                     folders or [NO_FOLDER_OPTION],
                     {
-                        "default": folders[0] if folders else NO_FOLDER_OPTION,
-                        "widgetType": "KREA2_LORA_SELECTION",
-                        "lora_files": list(folder_paths.get_filename_list("loras")),
-                        "tooltip": "点击打开 LoRA 树；左键展开，右键选择。单条固定，多条随机。",
+                        "default": default_folder,
+                        "tooltip": "选择 Krea2 LoRA 文件夹；会递归包含子文件夹。",
                     },
                 ),
                 "strength_model": (
@@ -206,7 +201,7 @@ class RandomLoraLoaderModelOnly:
                         "min": -100.0,
                         "max": 100.0,
                         "step": 0.01,
-                        "tooltip": "LoRA 对 MODEL 的作用强度。0 时保留原模型，但仍输出本次选择名称。",
+                        "tooltip": "模型强度。0 时保留原模型，但仍输出本次选择名称。",
                     },
                 ),
             }
@@ -215,7 +210,7 @@ class RandomLoraLoaderModelOnly:
     @classmethod
     def VALIDATE_INPUTS(cls, folder=None):
         if folder is None:
-            return "请选择至少一个 LoRA 文件或文件夹"
+            return "请选择一个 LoRA 文件夹"
         try:
             resolve_candidates(folder)
             return True
@@ -230,8 +225,6 @@ class RandomLoraLoaderModelOnly:
             candidates = resolve_candidates(folder)
         except ValueError:
             return float("nan")
-        # A single candidate is intentionally identical to the native fixed LoRA
-        # loader. Multi-selection must execute afresh to choose a new LoRA.
         if len(candidates) > 1:
             return float("nan")
         return ("fixed_lora", _canonical_filename(candidates[0]), float(strength_model))
@@ -249,7 +242,7 @@ class RandomLoraLoaderModelOnly:
         self.loaded_lora = (lora_path, lora, lora_metadata)
         return lora, lora_metadata
 
-    def load_random_lora(self, model, folder: Any, strength_model: float):
+    def load_random_lora(self, model, folder, strength_model):
         candidates = resolve_candidates(folder)
         selected_lora = candidates[0] if len(candidates) == 1 else random.choice(candidates)
 
